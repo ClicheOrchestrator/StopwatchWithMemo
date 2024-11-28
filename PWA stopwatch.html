@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Offline Stopwatch</title>
+    
+    <!-- React CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- PWA 相关标签 -->
+    <meta name="description" content="A simple stopwatch that works offline">
+    <meta name="theme-color" content="#1677ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Stopwatch">
+    
+    <!-- PWA 图标 -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192x192.png">
+    
+    <!-- PWA manifest -->
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
+        }
+        
+        #root {
+            padding: 10px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            min-width: 100px;
+            height: 50px;
+        }
+
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .button-primary {
+            background-color: #1677ff;
+            color: white;
+        }
+
+        .button-primary:hover:not(:disabled) {
+            background-color: #4096ff;
+        }
+
+        .button-danger {
+            background-color: #ff4d4f;
+            color: white;
+        }
+
+        .button-danger:hover:not(:disabled) {
+            background-color: #ff7875;
+        }
+
+        .button-default {
+            background-color: #ffffff;
+            border: 1px solid #d9d9d9;
+            color: rgba(0, 0, 0, 0.88);
+        }
+
+        .button-default:hover:not(:disabled) {
+            border-color: #4096ff;
+            color: #4096ff;
+        }
+
+        .input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .input:focus {
+            outline: none;
+            border-color: #4096ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .lap-list {
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+
+        .lap-header {
+            padding: 16px;
+            background-color: #fafafa;
+            border-bottom: 1px solid #d9d9d9;
+            font-weight: bold;
+        }
+
+        .lap-item {
+            padding: 16px;
+            border-bottom: 1px solid #d9d9d9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .lap-item:last-child {
+            border-bottom: none;
+        }
+
+        .memo-box {
+            background-color: #f5f5f5;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-left: 20px;
+            flex: 1;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .custom-message {
+            background-color: #FFE4E4;  /* 柔和的淡红色背景 */
+            border-left: 4px solid #FFB6B6; /* 略深的红色边框 */
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-size: 26px;
+            line-height: 1.5;
+            color: #666;  /* 文字颜色设置为灰色，让内容看起来不那么刺眼 */
+        }
+
+        .custom-message-input {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            border: 1px solid #FFB6B6;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-top: 10px;
+            color: #666;
+            resize: vertical;
+        }
+
+        .custom-message-input:focus {
+            outline: none;
+            border-color: #FF9999;
+            box-shadow: 0 0 0 2px rgba(255, 153, 153, 0.2);
+        }
+
+                /* 添加移动端优化样式 */
+                @media (max-width: 768px) {
+            body {
+                touch-action: manipulation;
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+            
+            .button {
+                min-height: 44px; /* 更适合触摸的按钮大小 */
+                margin: 8px 0;
+            }
+            
+            input {
+                font-size: 16px; /* 防止 iOS 自动放大 */
+            }
+        }
+
+                
+        /* 添加安装提示样式 */
+        .install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1677ff;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: none;
+            z-index: 1000;
+        }
+        
+        /* 添加全屏模式下的安全区域padding */
+        @supports (padding: max(0px)) {
+            body {
+                padding-left: max(10px, env(safe-area-inset-left));
+                padding-right: max(10px, env(safe-area-inset-right));
+                padding-bottom: max(10px, env(safe-area-inset-bottom));
+                padding-top: max(10px, env(safe-area-inset-top));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <div id="install-prompt" class="install-prompt">
+        点击添加到主屏幕以获得最佳体验
+    </div>
+    <script type="text/babel">
+        const { useState, useRef, useEffect, useCallback } = React;
+
+        const Stopwatch = () => {
+            const [time, setTime] = useState(0);
+            const [laps, setLaps] = useState([]);
+            const [isRunning, setIsRunning] = useState(false);
+            const [customMessage, setCustomMessage] = useState(localStorage.getItem('customMessage') || ''); // 添加这行
+
+            const intervalIdRef = useRef(null);
+            const startTimeRef = useRef(0);
+            const lapStartTimeRef = useRef(0);
+            const currentTimeRef = useRef(0); // 新增：用于跟踪当前时间
+
+            useEffect(() => {
+                const savedState = localStorage.getItem('stopwatchState');
+                if (savedState) {
+                    const shouldRestore = window.confirm("Would you like to restore your previous session?");
+                    if (shouldRestore) {
+                        const { time, laps, isRunning, startTime, lapStartTime, lastSaveTime } = JSON.parse(savedState);
+                        const now = Date.now();
+                        
+                        // 恢复 laps，处理中断的时间段
+                        let adjustedLaps = [...laps];  // 创建一个新的数组
+                        
+                        if (isRunning && lastSaveTime) {
+                            // 添加从上次保存到关闭时的时间段
+                            adjustedLaps.push({
+                                startTime: lapStartTime,
+                                endTime: lastSaveTime,
+                                time: lastSaveTime - lapStartTime,
+                                memo: '(Auto-saved period)',
+                                timestamp: new Date(lastSaveTime).toISOString()
+                            });
+                        }
+                        
+                        setLaps(adjustedLaps);
+                        setIsRunning(false); // 总是从停止状态开始
+                        
+                        // 计算总时间
+                        const totalTime = adjustedLaps.reduce((sum, lap) => sum + lap.time, 0);
+                        setTime(totalTime);
+                        
+                        // 更新引用
+                        startTimeRef.current = now - totalTime;
+                        lapStartTimeRef.current = now;
+                        currentTimeRef.current = totalTime;
+                    } else {
+                        localStorage.removeItem('stopwatchState');
+                    }
+                }
+            }, []);
+            
+            // 添加自动保存功能 - 每30秒保存一次
+            // 修改后的自动保存功能
+            useEffect(() => {
+                if (isRunning) {
+                    const autoSaveInterval = setInterval(() => {
+                        const now = Date.now();
+                        currentTimeRef.current = now - startTimeRef.current; // 更新当前时间
+                        
+                        localStorage.setItem('stopwatchState', JSON.stringify({
+                            time: currentTimeRef.current,
+                            laps: laps,
+                            isRunning,
+                            startTime: startTimeRef.current,
+                            lapStartTime: lapStartTimeRef.current,
+                            lastSaveTime: now // 记录最后保存时间
+                        }));
+                    }, 30000);
+
+                    return () => clearInterval(autoSaveInterval);
+                }
+            }, [isRunning, laps]);
+
+            const saveState = useCallback(() => {
+                const now = Date.now();
+                currentTimeRef.current = now - startTimeRef.current;
+                
+                localStorage.setItem('stopwatchState', JSON.stringify({
+                    time: currentTimeRef.current,
+                    laps,
+                    isRunning,
+                    startTime: startTimeRef.current,
+                    lapStartTime: lapStartTimeRef.current,
+                    lastSaveTime: now
+                }));
+            }, [time, laps, isRunning]);
+
+            const startStopwatch = () => {
+                if (!isRunning) {
+                    const now = Date.now();
+                    if (time === 0) {
+                        startTimeRef.current = now;
+                    } else {
+                        startTimeRef.current = now - time;
+                    }
+                    lapStartTimeRef.current = now;
+                    
+                    intervalIdRef.current = setInterval(() => {
+                        const currentTime = Date.now();
+                        setTime(currentTime - startTimeRef.current);
+                    }, 10);
+                    
+                    setIsRunning(true);
+                    saveState();
+                }
+            };
+
+            const stopStopwatch = () => {
+                if (isRunning) {
+                    const now = Date.now();
+                    clearInterval(intervalIdRef.current);
+                    
+                    // 添加最后一个 lap
+                    const lapTime = now - lapStartTimeRef.current;
+                    if (lapTime > 0) {
+                        setLaps(prevLaps => [
+                            ...prevLaps,
+                            {
+                                startTime: lapStartTimeRef.current,
+                                endTime: now,
+                                time: lapTime,
+                                memo: '',
+                                timestamp: new Date(now).toISOString()
+                            }
+                        ]);
+                    }
+                    
+                    setIsRunning(false);
+                    // 更新总时间
+                    setTime(time + lapTime);
+                    saveState();
+                }
+            };
+
+            const resetStopwatch = () => {
+                if (window.confirm("Are you sure you want to reset the stopwatch?")) {
+                    clearInterval(intervalIdRef.current);
+                    setTime(0);
+                    setLaps([]);
+                    setIsRunning(false);
+                    startTimeRef.current = 0;
+                    lapStartTimeRef.current = 0;
+                    saveState(); // 保存状态
+                }
+            };
+
+            const addLap = () => {
+                const now = Date.now();
+                const lapTime = now - lapStartTimeRef.current;
+                
+                if (lapTime > 0) {
+                    setLaps(prevLaps => [
+                        ...prevLaps,
+                        {
+                            startTime: lapStartTimeRef.current,
+                            endTime: now,
+                            time: lapTime,
+                            memo: '',
+                            timestamp: new Date(now).toISOString()
+                        }
+                    ]);
+                    
+                    lapStartTimeRef.current = now;
+                    saveState();
+                }
+            };
+            
+
+            const getCurrentLapTime = () => {
+                if (!isRunning && time === 0) return 0;
+                const now = Date.now();
+                return now - lapStartTimeRef.current;
+            };
+
+
+            const updateLapMemo = (index, memo) => {
+                setLaps(prevLaps => prevLaps.map((lap, i) => 
+                    i === index ? { ...lap, memo } : lap
+                ));
+                saveState(); // 保存状态
+            };
+
+            const formatTime = (ms) => {
+                const getTwoDigits = (num) => String(Math.floor(num)).padStart(2, '0');
+                const getThreeDigits = (num) => String(Math.floor(num)).padStart(3, '0');
+                
+                const hours = ms / (1000 * 60 * 60);
+                const minutes = (ms % (1000 * 60 * 60)) / (1000 * 60);
+                const seconds = (ms % (1000 * 60)) / 1000;
+                const milliseconds = ms % 1000;
+                
+                return (
+                    <span>
+                        <span style={{ fontSize: '2.5rem' }}>
+                            {getTwoDigits(hours)}:{getTwoDigits(minutes)}:{getTwoDigits(seconds)}
+                        </span>
+                        <span style={{ fontSize: '1rem', color: '#666' }}>
+                            .{getThreeDigits(milliseconds)}
+                        </span>
+                    </span>
+                );
+            };
+
+
+            const formatTimeForCSV = (ms) => {
+                const getTwoDigits = (num) => String(Math.floor(num)).padStart(2, '0');
+                const getThreeDigits = (num) => String(Math.floor(num)).padStart(3, '0');
+                
+                const hours = ms / (1000 * 60 * 60);
+                const minutes = (ms % (1000 * 60 * 60)) / (1000 * 60);
+                const seconds = (ms % (1000 * 60)) / 1000;
+                const milliseconds = ms % 1000;
+                
+                return `${getTwoDigits(hours)}:${getTwoDigits(minutes)}:${getTwoDigits(seconds)}.${getThreeDigits(milliseconds)}`;
+            };
+
+            const exportDataAsCSV = () => {
+                const BOM = '\uFEFF';
+                
+                const headers = "Lap Number,Lap Time,Start Time,End Time,Memo\n";
+                const rows = laps.map((lap, index) => 
+                    `${index + 1},${formatTimeForCSV(lap.time)},${new Date(lap.startTime).toLocaleString()},${new Date(lap.endTime).toLocaleString()},${lap.memo}`
+                ).join('\n');
+                const totalRow = `\nTotal Time,,${formatTimeForCSV(time)}`;
+                
+                const csvContent = BOM + headers + rows + totalRow;
+                
+                const blob = new Blob([csvContent], { 
+                    type: 'text/csv;charset=utf-8;' 
+                });
+                
+                const link = document.createElement("a");
+                if (link.download !== undefined) {
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute("href", url);
+                    link.setAttribute("download", `stopwatch_data_${new Date().toISOString()}.csv`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }
+            };
+
+            return (
+                <div>
+                    <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', textAlign: 'center' }}>
+                        Stopwatch
+                    </h1>
+                            {/* 在这里添加下面的代码 */}
+                    <div className="custom-message">
+                        <textarea
+                            className="custom-message-input"
+                            value={customMessage}
+                            onChange={(e) => {
+                                setCustomMessage(e.target.value);
+                                localStorage.setItem('customMessage', e.target.value);
+                            }}
+                            placeholder="在这里输入你的激励话语或待办事项..."
+                        />
+                    </div>
+                    <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                        {formatTime(time)}
+                    </div>
+                    
+                    <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                        Current Lap: {formatTime(getCurrentLapTime())}
+                    </div>
+                    
+                    <div className="button-group">
+                        <button 
+                            className="button button-primary"
+                            onClick={startStopwatch} 
+                            disabled={isRunning}
+                        >
+                            Start
+                        </button>
+                        
+                        <button 
+                            className="button button-danger"
+                            onClick={stopStopwatch} 
+                            disabled={!isRunning}
+                        >
+                            Stop
+                        </button>
+                        
+                        <button 
+                            className="button button-primary"
+                            onClick={addLap} 
+                            disabled={!isRunning}
+                        >
+                            Lap
+                        </button>
+                    </div>
+
+                    <button 
+                        className="button button-default"
+                        onClick={resetStopwatch}
+                        style={{ width: '100%', marginBottom: '10px' }}
+                    >
+                        Reset
+                    </button>
+
+                    {laps.length > 0 && (
+                        <div className="lap-list">
+                            <div className="lap-header">Laps</div>
+                            {laps.slice().reverse().map((lap, index) => (
+                                <div key={laps.length - index - 1} className="lap-item">
+                                    <div>
+                                        <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                                            Lap {laps.length - index}
+                                            <span style={{ 
+                                                fontSize: '0.8rem', 
+                                                color: '#666', 
+                                                marginLeft: '8px',
+                                                fontWeight: 'normal' 
+                                            }}>
+                                                ({lap.endTime === lap.startTime ? 'Lap' : 'Stop'})
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: '1.2rem' }}>
+                                            {formatTimeForCSV(lap.time)}
+                                        </div>
+                                        <div style={{ 
+                                            fontSize: '0.8rem', 
+                                            color: '#666', 
+                                            marginTop: '4px' 
+                                        }}>
+                                            Start: {new Date(lap.startTime).toLocaleString()}
+                                            <br/>
+                                            End: {new Date(lap.endTime).toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <div className="memo-box">
+                                        <input
+                                            className="input"
+                                            value={lap.memo}
+                                            onChange={(e) => updateLapMemo(laps.length - index - 1, e.target.value)}
+                                            placeholder="Add memo"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <button 
+                        className="button button-default"
+                        onClick={exportDataAsCSV}
+                        style={{ width: '100%', marginTop: '20px' }}
+                    >
+                        Export Data as CSV
+                    </button>
+                </div>
+            );
+        };
+
+        const { createRoot } = ReactDOM;
+        const root = createRoot(document.getElementById('root'));
+        root.render(React.createElement(Stopwatch));
+
+        // PWA 相关功能
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful');
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+
+        // 添加安装提示
+        let deferredPrompt;
+        const addBtn = document.createElement('button');
+        addBtn.style.display = 'none';
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            addBtn.style.display = 'block';
+            
+            // 如果存在安装提示元素，显示它
+            const installPrompt = document.getElementById('install-prompt');
+            if (installPrompt) {
+                installPrompt.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
