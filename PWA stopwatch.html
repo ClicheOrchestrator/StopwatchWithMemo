@@ -136,33 +136,34 @@
             margin: 20px 0;
         }
         .custom-message {
-            background-color: #FFE4E4;  /* 柔和的淡红色背景 */
-            border-left: 4px solid #FFB6B6; /* 略深的红色边框 */
+            background-color: #FFF1F0;  /* 更柔和的淡红色背景 */
+            border: 1px solid #FFCCC7;  /* 淡红色边框 */
             padding: 15px;
             margin: 20px 0;
             border-radius: 4px;
-            font-size: 26px;
+            font-size: 16px;
             line-height: 1.5;
-            color: #666;  /* 文字颜色设置为灰色，让内容看起来不那么刺眼 */
+            color: rgba(0, 0, 0, 0.88);
         }
 
         .custom-message-input {
-            width: 100%;
-            min-height: 100px;
+            width: calc(100% - 20px);
+            min-height: 60px;
             padding: 10px;
-            border: 1px solid #FFB6B6;
+            border: 1px solid #FFCCC7;  /* 匹配外框的颜色 */
             border-radius: 4px;
             font-size: 14px;
             line-height: 1.5;
-            margin-top: 10px;
-            color: #666;
+            margin: 0;
+            color: rgba(0, 0, 0, 0.88);
             resize: vertical;
+            background-color: #ffffff;
         }
 
         .custom-message-input:focus {
             outline: none;
-            border-color: #FF9999;
-            box-shadow: 0 0 0 2px rgba(255, 153, 153, 0.2);
+            border-color: #FF7875;  /* 红色系的焦点边框 */
+            box-shadow: 0 0 0 2px rgba(255, 120, 117, 0.2);  /* 红色系的焦点阴影 */
         }
 
                 /* 添加移动端优化样式 */
@@ -232,57 +233,57 @@
             useEffect(() => {
                 const savedState = localStorage.getItem('stopwatchState');
                 if (savedState) {
-                    const shouldRestore = window.confirm("Would you like to restore your previous session?");
-                    if (shouldRestore) {
-                        const { time, laps, isRunning, startTime, lapStartTime, lastSaveTime } = JSON.parse(savedState);
-                        const now = Date.now();
+                    const { time, laps, isRunning: wasRunning, startTime, lapStartTime } = JSON.parse(savedState);
+                    const now = Date.now();
+                    
+                    let adjustedLaps = [...laps];
+                    const lastLapStartTime = lapStartTime;
+                    
+                    // 计算总时间：所有已完成的 laps 加上当前运行的时间
+                    const completedLapsTime = adjustedLaps.reduce((sum, lap) => sum + lap.time, 0);
+                    const currentLapTime = wasRunning ? (now - lastLapStartTime) : 0;
+                    const totalTime = completedLapsTime + currentLapTime;
+                    
+                    // 如果之前在运行，自动继续运行
+                    if (wasRunning) {
+                        // 设置新的开始时间，保持总计时准确
+                        startTimeRef.current = now - totalTime;
+                        lapStartTimeRef.current = lastLapStartTime; // 保持上一个 lap 的开始时间
                         
-                        // 恢复 laps，处理中断的时间段
-                        let adjustedLaps = [...laps];  // 创建一个新的数组
+                        // 启动计时器
+                        intervalIdRef.current = setInterval(() => {
+                            const currentTime = Date.now();
+                            const elapsedTime = currentTime - startTimeRef.current;
+                            setTime(elapsedTime);
+                            currentTimeRef.current = elapsedTime;
+                        }, 10);
                         
-                        if (isRunning && lastSaveTime) {
-                            // 添加从上次保存到关闭时的时间段
-                            adjustedLaps.push({
-                                startTime: lapStartTime,
-                                endTime: lastSaveTime,
-                                time: lastSaveTime - lapStartTime,
-                                memo: '(Auto-saved period)',
-                                timestamp: new Date(lastSaveTime).toISOString()
-                            });
-                        }
-                        
-                        setLaps(adjustedLaps);
-                        setIsRunning(false); // 总是从停止状态开始
-                        
-                        // 计算总时间
-                        const totalTime = adjustedLaps.reduce((sum, lap) => sum + lap.time, 0);
-                        setTime(totalTime);
-                        
-                        // 更新引用
+                        setIsRunning(true);
+                    } else {
                         startTimeRef.current = now - totalTime;
                         lapStartTimeRef.current = now;
-                        currentTimeRef.current = totalTime;
-                    } else {
-                        localStorage.removeItem('stopwatchState');
+                        setIsRunning(false);
                     }
+                    
+                    setLaps(adjustedLaps);
+                    setTime(totalTime);
+                    currentTimeRef.current = totalTime;
                 }
             }, []);
             
-            // 添加自动保存功能 - 每30秒保存一次
-            // 修改后的自动保存功能
+            // 修改自动保存功能，移除 lastSaveTime
             useEffect(() => {
                 if (isRunning) {
                     const autoSaveInterval = setInterval(() => {
                         const now = Date.now();
-                        currentTimeRef.current = now - startTimeRef.current; // 更新当前时间
+                        currentTimeRef.current = now - startTimeRef.current;
                         
                         localStorage.setItem('stopwatchState', JSON.stringify({
                             time: currentTimeRef.current,
-                            laps: laps,
+                            laps,
                             isRunning,
                             startTime: startTimeRef.current,
-                            lapStartTime: lapStartTimeRef.current,
-                            lastSaveTime: now // 记录最后保存时间
+                            lapStartTime: lapStartTimeRef.current
                         }));
                     }, 30000);
 
@@ -292,15 +293,14 @@
 
             const saveState = useCallback(() => {
                 const now = Date.now();
-                currentTimeRef.current = now - startTimeRef.current;
+                const currentElapsedTime = isRunning ? now - startTimeRef.current : time;
                 
                 localStorage.setItem('stopwatchState', JSON.stringify({
-                    time: currentTimeRef.current,
+                    time: currentElapsedTime,
                     laps,
                     isRunning,
                     startTime: startTimeRef.current,
-                    lapStartTime: lapStartTimeRef.current,
-                    lastSaveTime: now
+                    lapStartTime: lapStartTimeRef.current
                 }));
             }, [time, laps, isRunning]);
 
@@ -316,7 +316,9 @@
                     
                     intervalIdRef.current = setInterval(() => {
                         const currentTime = Date.now();
-                        setTime(currentTime - startTimeRef.current);
+                        const elapsedTime = currentTime - startTimeRef.current;
+                        setTime(elapsedTime);
+                        currentTimeRef.current = elapsedTime; // 更新当前时间引用
                     }, 10);
                     
                     setIsRunning(true);
@@ -329,13 +331,16 @@
                     const now = Date.now();
                     clearInterval(intervalIdRef.current);
                     
-                    // 添加最后一个 lap
-                    const lapTime = now - lapStartTimeRef.current;
+                    // 保存当前 lap 的开始时间
+                    const currentLapStartTime = lapStartTimeRef.current;
+                    const lapTime = now - currentLapStartTime;
+                    const totalTime = now - startTimeRef.current;
+                    
                     if (lapTime > 0) {
                         setLaps(prevLaps => [
                             ...prevLaps,
                             {
-                                startTime: lapStartTimeRef.current,
+                                startTime: currentLapStartTime,  // 使用保存的开始时间
                                 endTime: now,
                                 time: lapTime,
                                 memo: '',
@@ -345,8 +350,8 @@
                     }
                     
                     setIsRunning(false);
-                    // 更新总时间
-                    setTime(time + lapTime);
+                    setTime(totalTime);
+                    currentTimeRef.current = totalTime;
                     saveState();
                 }
             };
@@ -364,23 +369,28 @@
             };
 
             const addLap = () => {
-                const now = Date.now();
-                const lapTime = now - lapStartTimeRef.current;
-                
-                if (lapTime > 0) {
-                    setLaps(prevLaps => [
-                        ...prevLaps,
-                        {
-                            startTime: lapStartTimeRef.current,
-                            endTime: now,
-                            time: lapTime,
-                            memo: '',
-                            timestamp: new Date(now).toISOString()
-                        }
-                    ]);
+                if (isRunning) {
+                    const now = Date.now();
+                    const lapTime = now - lapStartTimeRef.current;
                     
-                    lapStartTimeRef.current = now;
-                    saveState();
+                    if (lapTime > 0) {
+                        // 保存当前 lap 的开始时间
+                        const currentLapStartTime = lapStartTimeRef.current;
+                        
+                        setLaps(prevLaps => [
+                            ...prevLaps,
+                            {
+                                startTime: currentLapStartTime,  // 使用保存的开始时间
+                                endTime: now,
+                                time: lapTime,
+                                memo: '',
+                                timestamp: new Date(now).toISOString()
+                            }
+                        ]);
+                        
+                        lapStartTimeRef.current = now; // 为下一个 lap 设置新的开始时间
+                        saveState();
+                    }
                 }
             };
             
