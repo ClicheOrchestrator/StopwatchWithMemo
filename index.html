@@ -219,17 +219,21 @@
     <script type="text/babel">
         const { useState, useRef, useEffect, useCallback } = React;
 
+        // 秒表组件
         const Stopwatch = () => {
-            const [time, setTime] = useState(0);
-            const [laps, setLaps] = useState([]);
-            const [isRunning, setIsRunning] = useState(false);
-            const [customMessage, setCustomMessage] = useState(localStorage.getItem('customMessage') || ''); // 添加这行
+            // 状态管理
+            const [time, setTime] = useState(0);          // 总计时时间
+            const [laps, setLaps] = useState([]);         // 所有计次记录
+            const [isRunning, setIsRunning] = useState(false);  // 秒表运行状态
+            const [customMessage, setCustomMessage] = useState(localStorage.getItem('customMessage') || ''); // 自定义消息
 
-            const intervalIdRef = useRef(null);
-            const startTimeRef = useRef(0);
-            const lapStartTimeRef = useRef(0);
-            const currentTimeRef = useRef(0); // 新增：用于跟踪当前时间
+            // 引用值管理
+            const intervalIdRef = useRef(null);           // 定时器ID
+            const startTimeRef = useRef(0);              // 开始时间戳
+            const lapStartTimeRef = useRef(0);           // 当前计次开始时间戳
+            const currentTimeRef = useRef(0);            // 当前时间引用
 
+            // 初始化效果：从本地存储恢复状态
             useEffect(() => {
                 const savedState = localStorage.getItem('stopwatchState');
                 if (savedState) {
@@ -239,18 +243,17 @@
                     let adjustedLaps = [...laps];
                     const lastLapStartTime = lapStartTime;
                     
-                    // 计算总时间：所有已完成的 laps 加上当前运行的时间
+                    // 计算总时间：已完成的计次时间 + 当前运行时间
                     const completedLapsTime = adjustedLaps.reduce((sum, lap) => sum + lap.time, 0);
                     const currentLapTime = wasRunning ? (now - lastLapStartTime) : 0;
                     const totalTime = completedLapsTime + currentLapTime;
                     
                     // 如果之前在运行，自动继续运行
                     if (wasRunning) {
-                        // 设置新的开始时间，保持总计时准确
                         startTimeRef.current = now - totalTime;
-                        lapStartTimeRef.current = lastLapStartTime; // 保持上一个 lap 的开始时间
+                        lapStartTimeRef.current = lastLapStartTime;
                         
-                        // 启动计时器
+                        // 启动计时器，每10ms更新一次
                         intervalIdRef.current = setInterval(() => {
                             const currentTime = Date.now();
                             const elapsedTime = currentTime - startTimeRef.current;
@@ -271,7 +274,7 @@
                 }
             }, []);
             
-            // 修改自动保存功能，移除 lastSaveTime
+            // 自动保存效果：运行时每30秒保存一次状态
             useEffect(() => {
                 if (isRunning) {
                     const autoSaveInterval = setInterval(() => {
@@ -291,6 +294,7 @@
                 }
             }, [isRunning, laps]);
 
+            // 保存状态到本地存储
             const saveState = useCallback(() => {
                 const now = Date.now();
                 const currentElapsedTime = isRunning ? now - startTimeRef.current : time;
@@ -304,6 +308,7 @@
                 }));
             }, [time, laps, isRunning]);
 
+            // 开始计时
             const startStopwatch = () => {
                 if (!isRunning) {
                     const now = Date.now();
@@ -326,6 +331,7 @@
                 }
             };
 
+            // 停止计时
             const stopStopwatch = () => {
                 if (isRunning) {
                     const now = Date.now();
@@ -356,6 +362,7 @@
                 }
             };
 
+            // 重置秒表
             const resetStopwatch = () => {
                 if (window.confirm("Are you sure you want to reset the stopwatch?")) {
                     clearInterval(intervalIdRef.current);
@@ -368,6 +375,7 @@
                 }
             };
 
+            // 添加计次
             const addLap = () => {
                 if (isRunning) {
                     const now = Date.now();
@@ -395,6 +403,7 @@
             };
             
 
+            // 获取当前计次时间
             const getCurrentLapTime = () => {
                 if (!isRunning && time === 0) return 0;
                 const now = Date.now();
@@ -402,6 +411,7 @@
             };
 
 
+            // 更新计次备忘录
             const updateLapMemo = (index, memo) => {
                 setLaps(prevLaps => prevLaps.map((lap, i) => 
                     i === index ? { ...lap, memo } : lap
@@ -409,6 +419,7 @@
                 saveState(); // 保存状态
             };
 
+            // 格式化时间显示（用于UI显示）
             const formatTime = (ms) => {
                 const getTwoDigits = (num) => String(Math.floor(num)).padStart(2, '0');
                 const getThreeDigits = (num) => String(Math.floor(num)).padStart(3, '0');
@@ -431,6 +442,7 @@
             };
 
 
+            // 格式化时间（用于CSV导出）
             const formatTimeForCSV = (ms) => {
                 const getTwoDigits = (num) => String(Math.floor(num)).padStart(2, '0');
                 const getThreeDigits = (num) => String(Math.floor(num)).padStart(3, '0');
@@ -443,6 +455,7 @@
                 return `${getTwoDigits(hours)}:${getTwoDigits(minutes)}:${getTwoDigits(seconds)}.${getThreeDigits(milliseconds)}`;
             };
 
+            // 导出数据为CSV文件
             const exportDataAsCSV = () => {
                 const BOM = '\uFEFF';
                 
@@ -471,6 +484,7 @@
                 }
             };
 
+            // 渲染UI
             return (
                 <div>
                     <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', textAlign: 'center' }}>
@@ -584,24 +598,25 @@
             );
         };
 
+        // 渲染React应用
         const { createRoot } = ReactDOM;
         const root = createRoot(document.getElementById('root'));
         root.render(React.createElement(Stopwatch));
 
-        // PWA 相关功能
+        // PWA相关功能
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js')
                     .then(registration => {
-                        console.log('ServiceWorker registration successful');
+                        console.log('ServiceWorker注册成功');
                     })
                     .catch(err => {
-                        console.log('ServiceWorker registration failed: ', err);
+                        console.log('ServiceWorker注册失败: ', err);
                     });
             });
         }
 
-        // 添加安装提示
+        // PWA安装提示处理
         let deferredPrompt;
         const addBtn = document.createElement('button');
         addBtn.style.display = 'none';
@@ -611,7 +626,7 @@
             deferredPrompt = e;
             addBtn.style.display = 'block';
             
-            // 如果存在安装提示元素，显示它
+            // 显示安装提示
             const installPrompt = document.getElementById('install-prompt');
             if (installPrompt) {
                 installPrompt.style.display = 'block';
