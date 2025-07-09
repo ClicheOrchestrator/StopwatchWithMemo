@@ -209,6 +209,12 @@
                 padding-top: max(10px, env(safe-area-inset-top));
             }
         }
+        /* 倒计时覆盖层闪烁动画 */
+        @keyframes countdownFlash {
+            0%   { background-color: rgba(255, 0, 0, 0.10); }
+            50%  { background-color: rgba(255, 0, 0, 0.30); }
+            100% { background-color: rgba(255, 0, 0, 0.10); }
+        }
     </style>
 </head>
 <body>
@@ -226,12 +232,21 @@
             const [laps, setLaps] = useState([]);         // 所有计次记录
             const [isRunning, setIsRunning] = useState(false);  // 秒表运行状态
             const [customMessage, setCustomMessage] = useState(localStorage.getItem('customMessage') || ''); // 自定义消息
+            // 倒计时提醒相关状态
+            const [countdownDuration, setCountdownDuration] = useState(5 * 60 * 1000); // 默认 5 分钟
+            const [countdownRemaining, setCountdownRemaining] = useState(5 * 60 * 1000);
+            const [isCountdownRunning, setIsCountdownRunning] = useState(false);
+            const [showCountdownAlert, setShowCountdownAlert] = useState(false);
 
             // 引用值管理
             const intervalIdRef = useRef(null);           // 定时器ID
             const startTimeRef = useRef(0);              // 开始时间戳
             const lapStartTimeRef = useRef(0);           // 当前计次开始时间戳
             const currentTimeRef = useRef(0);            // 当前时间引用
+
+            // 倒计时引用
+            const countdownIntervalRef = useRef(null);   // 倒计时定时器 ID
+            const countdownStartRef = useRef(null);      // 倒计时当前周期开始时间
 
             // 初始化效果：从本地存储恢复状态
             useEffect(() => {
@@ -419,6 +434,79 @@
                 saveState(); // 保存状态
             };
 
+            /* ---------------- 倒计时提醒逻辑 ---------------- */
+
+            // 格式化倒计时显示（mm:ss）
+            const formatCountdown = (ms) => {
+                const minutes = Math.floor(ms / 60000);
+                const seconds = Math.floor((ms % 60000) / 1000);
+                return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            };
+
+            // 启动倒计时
+            const startCountdown = () => {
+                if (!isCountdownRunning) {
+                    countdownStartRef.current = Date.now();
+                    setIsCountdownRunning(true);
+
+                    countdownIntervalRef.current = setInterval(() => {
+                        const elapsed = Date.now() - countdownStartRef.current;
+                        let remaining = countdownDuration - elapsed;
+
+                        if (remaining <= 0) {
+                            // 触发提醒
+                            setShowCountdownAlert(true);
+
+                            // 无缝进入下一周期
+                            countdownStartRef.current = Date.now();
+                            remaining += countdownDuration;
+                        }
+
+                        setCountdownRemaining(remaining);
+                    }, 200);
+                }
+            };
+
+            // 停止倒计时
+            const stopCountdown = () => {
+                if (isCountdownRunning) {
+                    clearInterval(countdownIntervalRef.current);
+                    setIsCountdownRunning(false);
+                }
+            };
+
+            // 修改倒计时时长
+            const changeCountdownDuration = () => {
+                const minutesStr = prompt("请输入倒计时时长（单位：分钟）", (countdownDuration / 60000).toString());
+                const minutes = parseFloat(minutesStr);
+                if (!isNaN(minutes) && minutes > 0) {
+                    const newDuration = minutes * 60 * 1000;
+                    setCountdownDuration(newDuration);
+                    setCountdownRemaining(newDuration);
+
+                    // 如果正在运行，重启倒计时
+                    if (isCountdownRunning) {
+                        clearInterval(countdownIntervalRef.current);
+                        countdownStartRef.current = Date.now();
+                        countdownIntervalRef.current = setInterval(() => {
+                            const elapsed = Date.now() - countdownStartRef.current;
+                            let remaining = newDuration - elapsed;
+                            if (remaining <= 0) {
+                                setShowCountdownAlert(true);
+                                countdownStartRef.current = Date.now();
+                                remaining += newDuration;
+                            }
+                            setCountdownRemaining(remaining);
+                        }, 200);
+                    }
+                }
+            };
+
+            // 组件卸载时清理倒计时定时器
+            useEffect(() => {
+                return () => clearInterval(countdownIntervalRef.current);
+            }, []);
+
             // 格式化时间显示（用于UI显示）
             const formatTime = (ms) => {
                 const getTwoDigits = (num) => String(Math.floor(num)).padStart(2, '0');
@@ -594,6 +682,68 @@
                     >
                         Export Data as CSV
                     </button>
+
+                    {/* ---------------- 倒计时提醒 UI ---------------- */}
+                    <hr style={{ margin: '40px 0' }} />
+                    <h2 style={{ textAlign: 'center' }}>倒计时提醒</h2>
+                    <div style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: '20px' }}>
+                        {formatCountdown(countdownRemaining)}
+                    </div>
+                    <div className="button-group">
+                        <button
+                            className="button button-primary"
+                            onClick={startCountdown}
+                            disabled={isCountdownRunning}
+                        >
+                            开始倒计时
+                        </button>
+                        <button
+                            className="button button-danger"
+                            onClick={stopCountdown}
+                            disabled={!isCountdownRunning}
+                        >
+                            停止倒计时
+                        </button>
+                        <button
+                            className="button button-default"
+                            onClick={changeCountdownDuration}
+                        >
+                            设置倒计时 ({Math.round(countdownDuration / 60000)} 分钟)
+                        </button>
+                    </div>
+
+                    {/* 倒计时提醒覆盖层 */}
+                    {showCountdownAlert && (
+                        <div style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            backgroundColor: 'rgba(255, 0, 0, 0.10)',
+                            animation: 'countdownFlash 3s ease-in-out infinite',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 9999
+                        }}>
+                            <div style={{
+                                backgroundColor: '#ffffff',
+                                padding: '20px 40px',
+                                borderRadius: '8px',
+                                textAlign: 'center',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                            }}>
+                                <p style={{ fontSize: '1.2rem', marginBottom: '20px', color: '#ff4d4f' }}>倒计时结束！</p>
+                                <button
+                                    className="button button-primary"
+                                    onClick={() => setShowCountdownAlert(false)}
+                                >
+                                    确认
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
