@@ -458,6 +458,8 @@
             );
             // 设置面板状态
             const [showSettings, setShowSettings] = useState(false);
+            // 当前计次笔记（用于还未添加到laps数组中的当前计次）
+            const [currentLapMemo, setCurrentLapMemo] = useState('');
 
             // 引用值管理
             const intervalIdRef = useRef(null);           // 定时器ID
@@ -598,11 +600,14 @@
                                 startTime: currentLapStartTime,  // 使用保存的开始时间
                                 endTime: now,
                                 time: lapTime,
-                                memo: '',
+                                memo: currentLapMemo, // 使用当前已输入的笔记
                                 timestamp: new Date(now).toISOString()
                             }
                         ]);
                     }
+                    
+                    // 重置当前笔记
+                    setCurrentLapMemo('');
                     
                     setIsRunning(false);
                     setTime(totalTime);
@@ -640,10 +645,13 @@
                                 startTime: currentLapStartTime,  // 使用保存的开始时间
                                 endTime: now,
                                 time: lapTime,
-                                memo: '',
+                                memo: currentLapMemo, // 使用当前已输入的笔记
                                 timestamp: new Date(now).toISOString()
                             }
                         ]);
+                        
+                        // 重置当前笔记，为下一个计次做准备
+                        setCurrentLapMemo('');
                         
                         lapStartTimeRef.current = now; // 为下一个 lap 设置新的开始时间
                         saveState();
@@ -969,6 +977,23 @@
                     >
                         Reset
                     </button>
+
+                    {/* 当前Lap的笔记输入框 */}
+                    <div className="memo-box" style={{ marginTop: '20px', marginBottom: '20px' }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>当前计次笔记</h3>
+                        <input
+                            className="input"
+                            placeholder="为当前计次添加笔记..."
+                            onChange={(e) => setCurrentLapMemo(e.target.value)}
+                            value={currentLapMemo}
+                            disabled={!isRunning}
+                        />
+                        {!isRunning && 
+                            <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
+                                开始计时后可添加笔记
+                            </p>
+                        }
+                    </div>
 
                     {/* ---------------- 倒计时提醒 UI ---------------- */}
                     <div style={{ margin: '20px 0' }}>
